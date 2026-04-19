@@ -1,9 +1,27 @@
 import subprocess
 import json
 import os
+import shutil
+import sys
 from pathlib import Path
-from typing import Optional
 from config import DEFAULT_SEMGREP_CONFIG, CONTEXT_LINES
+
+
+def _find_semgrep() -> str:
+    """Locate the semgrep executable, handles venv and Windows edge cases."""
+    # Check PATH first
+    found = shutil.which("semgrep")
+    if found:
+        return found
+    # Fallback: look next to the current Python executable (same venv)
+    venv_bin = Path(sys.executable).parent
+    for name in ("semgrep", "semgrep.exe", "semgrep.cmd"):
+        candidate = venv_bin / name
+        if candidate.exists():
+            return str(candidate)
+    raise FileNotFoundError(
+        "semgrep not found. Install it with: pip install semgrep"
+    )
 
 
 def run_semgrep(target_path: str, config: str = DEFAULT_SEMGREP_CONFIG) -> list[dict]:
@@ -12,8 +30,10 @@ def run_semgrep(target_path: str, config: str = DEFAULT_SEMGREP_CONFIG) -> list[
     if not target.exists():
         raise FileNotFoundError(f"Target path does not exist: {target}")
 
+    semgrep_bin = _find_semgrep()
+
     cmd = [
-        "semgrep",
+        semgrep_bin,
         "scan",
         f"--config={config}",
         "--json",
