@@ -101,6 +101,3 @@ def _get_code_context(file_path: str, start_line: int, end_line: int) -> str:
         return ""
 
 
-def save_raw_results(findings: list[dict], output_path: str = "semgrep_results.json"):
-    with open(output_path, "w") as f:
-        json.dump(findings, f, indent=2)
