@@ -1,5 +1,6 @@
 from openai import OpenAI
 from config import OPENAI_API_KEY, OPENAI_MODEL
+import concurrent.futures
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -59,10 +60,18 @@ def generate_fixes(findings: list[dict], verbose: bool = False) -> list[dict]:
     confirmed = [f for f in findings if not f.get("is_false_positive", False)]
     skipped = [f for f in findings if f.get("is_false_positive", False)]
 
-    for i, finding in enumerate(confirmed, 1):
-        if verbose:
-            print(f"  generating fix [{i}/{len(confirmed)}]: {finding['file']}:{finding['line_start']}")
-        result.append(generate_fix(finding))
+    # Preserve order and generate fixes concurrently
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        # submit tasks
+        futures = []
+        for i, finding in enumerate(confirmed, 1):
+            if verbose:
+                print(f"  generating fix [{i}/{len(confirmed)}]: {finding['file']}:{finding['line_start']}")
+            futures.append(executor.submit(generate_fix, finding))
+
+        # Collect results in order
+        for future in futures:
+            result.append(future.result())
 
     # false positives pass through without a fix
     result.extend(skipped)
