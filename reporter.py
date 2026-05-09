@@ -194,13 +194,22 @@ def print_summary(report: dict):
     table.add_column("Line", width=6)
     table.add_column("Rule", width=40)
 
-    colors = {"critical": "red", "high": "yellow", "medium": "bright_yellow", "low": "green"}
+    risk_format = {
+        "critical": "[red]CRITICAL[/red]",
+        "high": "[yellow]HIGH[/yellow]",
+        "medium": "[bright_yellow]MEDIUM[/bright_yellow]",
+        "low": "[green]LOW[/green]",
+    }
 
     for f in report["confirmed_findings"]:
         lvl = f.get("risk_level", "low")
-        color = colors.get(lvl, "white")
+        risk_str = risk_format.get(lvl)
+        if not risk_str:
+            color = "white"
+            risk_str = f"[{color}]{lvl.upper()}[/{color}]"
+
         table.add_row(
-            f"[{color}]{lvl.upper()}[/{color}]",
+            risk_str,
             f["file"],
             str(f["line_start"]),
             f["rule_id"].split(".")[-1],
