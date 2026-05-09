@@ -1,3 +1,4 @@
+import concurrent.futures
 from openai import OpenAI
 from config import OPENAI_API_KEY, OPENAI_MODEL
 
@@ -76,11 +77,15 @@ def triage_finding(finding: dict) -> dict:
 
 def triage_all(findings: list[dict], verbose: bool = False) -> list[dict]:
     """Triage all findings. Returns list with triage results attached."""
-    triaged = []
-    for i, finding in enumerate(findings, 1):
+    def _triage_with_print(args):
+        i, finding = args
         if verbose:
             print(f"  triaging [{i}/{len(findings)}]: {finding['file']}:{finding['line_start']}")
-        triaged.append(triage_finding(finding))
+        return triage_finding(finding)
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+        triaged = list(executor.map(_triage_with_print, enumerate(findings, 1)))
+
     return triaged
 
 
