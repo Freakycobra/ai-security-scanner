@@ -52,16 +52,10 @@ def parse_args():
     return parser.parse_args()
 
 
-def main():
-    args = parse_args()
-
-    if not OPENAI_API_KEY:
-        print("Error: OPENAI_API_KEY environment variable is not set.", file=sys.stderr)
-        sys.exit(1)
-
-    print(f"[1/4] Running Semgrep on {args.target} (config: {args.config})...")
+def _run_scan(target, config):
+    print(f"[1/4] Running Semgrep on {target} (config: {config})...")
     try:
-        findings = run_semgrep(args.target, config=args.config)
+        findings = run_semgrep(target, config=config)
     except (FileNotFoundError, RuntimeError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -71,25 +65,36 @@ def main():
         sys.exit(0)
 
     print(f"       {len(findings)} raw finding(s) from Semgrep")
+    return findings
 
+
+def _run_triage(findings, verbose):
     print(f"[2/4] Triaging findings with LLM...")
-    triaged = triage_all(findings, verbose=args.verbose)
+    triaged = triage_all(findings, verbose=verbose)
 
     confirmed_count = sum(1 for f in triaged if not f.get("is_false_positive"))
     fp_count = len(triaged) - confirmed_count
     print(f"       {confirmed_count} confirmed, {fp_count} false positive(s)")
 
-    if not args.no_fix and confirmed_count > 0:
+    return triaged, confirmed_count
+
+
+def _run_fix(triaged, confirmed_count, no_fix, verbose):
+    if not no_fix and confirmed_count > 0:
         print(f"[3/4] Generating fixes for confirmed vulnerabilities...")
-        triaged = generate_fixes(triaged, verbose=args.verbose)
+        triaged = generate_fixes(triaged, verbose=verbose)
     else:
         print(f"[3/4] Skipping fix generation")
 
-    print(f"[4/4] Building report...")
-    report = build_report(triaged, target=args.target)
+    return triaged
 
-    json_path = save_json_report(report, args.json_output)
-    html_path = save_html_report(report, args.output)
+
+def _run_report(triaged, target, json_output, output, fail_on_findings):
+    print(f"[4/4] Building report...")
+    report = build_report(triaged, target=target)
+
+    json_path = save_json_report(report, json_output)
+    html_path = save_html_report(report, output)
 
     print_summary(report)
 
@@ -97,8 +102,21 @@ def main():
     print(f"  HTML: {html_path}")
     print(f"  JSON: {json_path}")
 
-    if args.fail_on_findings and has_high_or_critical(triaged):
+    if fail_on_findings and has_high_or_critical(triaged):
         sys.exit(1)
+
+
+def main():
+    args = parse_args()
+
+    if not OPENAI_API_KEY:
+        print("Error: OPENAI_API_KEY environment variable is not set.", file=sys.stderr)
+        sys.exit(1)
+
+    findings = _run_scan(args.target, args.config)
+    triaged, confirmed_count = _run_triage(findings, args.verbose)
+    triaged = _run_fix(triaged, confirmed_count, args.no_fix, args.verbose)
+    _run_report(triaged, args.target, args.json_output, args.output, args.fail_on_findings)
 
 
 if __name__ == "__main__":
