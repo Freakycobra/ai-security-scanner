@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 import argparse
 import sys
-import os
 
 from scanner import run_semgrep
 from triage import triage_all, has_high_or_critical
