@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 from pathlib import Path
-from jinja2 import Template
+from jinja2 import Template, Environment, select_autoescape
 
 
 REPORT_TEMPLATE = """<!DOCTYPE html>
@@ -167,7 +167,8 @@ def save_json_report(report: dict, path: str = "security_report.json"):
 
 
 def save_html_report(report: dict, path: str = "security_report.html"):
-    tmpl = Template(REPORT_TEMPLATE)
+    env = Environment(autoescape=select_autoescape(['html', 'xml']))
+    tmpl = env.from_string(REPORT_TEMPLATE)
     html = tmpl.render(**report)
     with open(path, "w", encoding="utf-8") as f:
         f.write(html)
